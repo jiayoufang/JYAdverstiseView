@@ -22,6 +22,8 @@ static const CGFloat pageCtrlWidth = 200;
 
 @property(nonatomic,assign) CGRect aFrame;
 
+@property(nonatomic,assign) NSInteger cuttentPage;
+
 @end
 
 @implementation JYAdvertiseView
@@ -31,10 +33,22 @@ static const CGFloat pageCtrlWidth = 200;
     self = [super initWithFrame:frame];
     if (self) {
         _aFrame = frame;
-        [self initScrollView];
-        [self addTimer];
+//        [self initScrollView];
+//        [self addTimer];
+        
+        _dataSources = @[[UIColor redColor],[UIColor colorWithRed:0.923 green:1.000 blue:0.655 alpha:1.000],[UIColor colorWithRed:0.568 green:1.000 blue:0.416 alpha:1.000],[UIColor colorWithRed:0.220 green:0.295 blue:1.000 alpha:1.000],[UIColor colorWithRed:0.944 green:0.339 blue:1.000 alpha:1.000],[UIColor colorWithRed:0.445 green:1.000 blue:0.929 alpha:1.000],[UIColor colorWithRed:1.000 green:0.211 blue:0.816 alpha:1.000]];
+        [self initSubviews];
     }
     return self;
+}
+
+- (void)initSubviews
+{
+    self.cuttentPage = 0;
+    [self addSubview:self.scrollView];
+    [self addSubview:self.pageControl];
+    
+    [self addTimer];
 }
 
 #pragma mark - init
@@ -63,6 +77,51 @@ static const CGFloat pageCtrlWidth = 200;
     [self insertSubview:self.pageControl aboveSubview:self.scrollView];
 }
 
+- (void)layoutSubviews
+{
+    [super layoutSubviews];
+    CGFloat width = CGRectGetWidth(self.frame);
+    CGFloat height = CGRectGetHeight(self.frame);
+    for (UIView *view in self.scrollView.subviews) {
+        if ([view isKindOfClass:[UIImageView class]]) {
+            UIImageView *imageView = (UIImageView *)view;
+            imageView.frame = CGRectMake(imageView.tag * width, 0, width, height);
+        }
+    }
+    self.scrollView.frame = self.bounds;
+    self.scrollView.contentSize = CGSizeMake(width * 3, height);
+    self.scrollView.contentOffset = CGPointMake(width, 0);
+}
+
+#pragma mark - Getter Init
+
+/*!
+ *  @author FJY
+ *
+ *  @brief  初始化ScrollView
+ */
+- (UIScrollView *)scrollView
+{
+    if (!_scrollView) {
+        _scrollView = [[UIScrollView alloc]init];
+        _scrollView.showsHorizontalScrollIndicator = NO;
+        _scrollView.showsVerticalScrollIndicator = NO;
+        _scrollView.directionalLockEnabled = YES;
+        _scrollView.pagingEnabled = YES;
+        _scrollView.delegate = self;
+        _scrollView.backgroundColor = [UIColor clearColor];
+        _scrollView.contentOffset = CGPointMake(0, 0);
+        _scrollView.translatesAutoresizingMaskIntoConstraints = NO;
+        
+        for (NSInteger i = 0; i < 3; i++) {
+            UIImageView *imageView = [[UIImageView alloc]init];
+            imageView.tag = i;
+            [_scrollView addSubview:imageView];
+        }
+    }
+    return _scrollView;
+}
+
 /*!
  *  @author FJY
  *
@@ -72,7 +131,7 @@ static const CGFloat pageCtrlWidth = 200;
 {
     if (!_pageControl) {
         _pageControl = [[UIPageControl alloc]initWithFrame:CGRectMake((CGRectGetWidth(_aFrame)-pageCtrlWidth)*0.5, (CGRectGetHeight(_aFrame)-scrollY), pageCtrlWidth, scrollY)];
-        _pageControl.numberOfPages = kAdvertiseCount;
+        _pageControl.numberOfPages = _dataSources.count;
         _pageControl.pageIndicatorTintColor = [UIColor redColor];
         _pageControl.currentPageIndicatorTintColor = [UIColor greenColor];
     }
@@ -112,16 +171,8 @@ static const CGFloat pageCtrlWidth = 200;
  */
 - (void)nextPage
 {
-    NSInteger page = self.pageControl.currentPage;
-    page++;
-    CGPoint point = CGPointMake(CGRectGetWidth(_aFrame)*(page%kAdvertiseCount), scrollY);
-    
-    [UIView animateWithDuration:0.5f animations:^{
-        self.scrollView.contentOffset = point;
-    } completion:^(BOOL finished) {
-        
-    }];
-    //    NSLog(@"page = %@ ",@(page));
+    CGPoint offSet = CGPointMake(self.scrollView.contentOffset.x + CGRectGetWidth(self.scrollView.frame), 0);
+    [self.scrollView setContentOffset:offSet animated:YES];
 }
 
 
@@ -136,16 +187,57 @@ static const CGFloat pageCtrlWidth = 200;
     self.timer = nil;
 }
 
+- (NSInteger)getNextPageIndexWithPageIndex:(NSInteger)currentIndex
+{
+    NSInteger index;
+    if (currentIndex == -1) {
+        index = _dataSources.count - 1;
+    }
+    else if (currentIndex == _dataSources.count){
+        index = 0;
+    }
+    else{
+        index = currentIndex;
+    }
+    return index;
+}
+
+- (void)showCurrentImages
+{
+    if (_dataSources.count == 0) {
+        return;
+    }
+    
+    for (UIView *view in self.scrollView.subviews) {
+        if ([view isKindOfClass:[UIImageView class]]) {
+            UIImageView *imageView = (UIImageView *)view;
+            UIColor *color = [self getImageBackgroundColor:imageView.tag];
+            imageView.backgroundColor = color;
+        }
+    }
+    
+    [self.scrollView setContentOffset:CGPointMake(self.scrollView.frame.size.width, 0) animated:NO];
+}
+
+- (UIColor *)getImageBackgroundColor:(NSInteger)tag
+{
+    NSInteger index = [self getNextPageIndexWithPageIndex:self.cuttentPage + (tag - 1)];
+    return [_dataSources objectAtIndex:index];
+}
+
 #pragma mark - ScrollViewDelegate
 - (void)scrollViewDidScroll:(UIScrollView *)scrollView
 {
-    //加0.5是为了当前页面有两张图片的时候，滑动到下一张
-    NSInteger page = scrollView.contentOffset.x/CGRectGetWidth(_aFrame) + 0.5;
-    [UIView animateWithDuration:0.5f animations:^{
-        self.pageControl.currentPage = page;
-    } completion:^(BOOL finished) {
-        
-    }];
+    self.pageControl.currentPage = [self getNextPageIndexWithPageIndex:self.cuttentPage];
+    if (scrollView.contentOffset.x >= 2*CGRectGetWidth(scrollView.frame)) {
+        self.cuttentPage = [self getNextPageIndexWithPageIndex:self.cuttentPage + 1];
+        [self showCurrentImages];
+    }
+    
+    if (scrollView.contentOffset.x <= 0) {
+        self.cuttentPage = [self getNextPageIndexWithPageIndex:self.cuttentPage - 1];
+        [self showCurrentImages];
+    }
     
 }
 
@@ -163,6 +255,11 @@ static const CGFloat pageCtrlWidth = 200;
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         [self addTimer];
     });
+}
+
+- (void)scrollViewDidEndDecelerating:(UIScrollView *)scrollView
+{
+    [scrollView setContentOffset:CGPointMake(CGRectGetWidth(self.scrollView.frame), 0) animated:YES];
 }
 
 #pragma mark - Action

@@ -20,6 +20,7 @@
     // Do any additional setup after loading the view, typically from a nib.
     
     JYAdvertiseView *advertiseView = [[JYAdvertiseView alloc]initWithFrame:CGRectMake(0, 100, CGRectGetWidth(self.view.bounds), 150)];
+    advertiseView.backgroundColor = [UIColor purpleColor];
     [self.view addSubview:advertiseView];
     
 }
